@@ -11,7 +11,7 @@ function stage_test_bootstrap(preObject) {
 	preObject.goal.acceptFunc = stage_test_functions.goal_acceptFunc;
 	
 	preObject.nodes[0].acceptFunc = stage_test_functions.node_0_acceptFunc;
-	preObject.nodes[0].fFunc = TCGLogic.CommonFunctions.AcceptFunctions.Pass;
+	preObject.nodes[0].fFunc = TCGLogic.CommonFunctions.OutputFunctions.Pass;
 	
 	return preObject;
 }

@@ -103,11 +103,11 @@ var TCGLogic = {
 				nodeInstance.state = false;
 			}
 			
-			if (typeof nodeInstance.xBufferSize != "undefined")
+			if (typeof currentNodeData.xBufferSize != "undefined")
 			{
 				nodeInstance.xBuffer = "";
 			}
-			if (typeof nodeInstance.yBufferSize != "undefined")
+			if (typeof currentNodeData.yBufferSize != "undefined")
 			{
 				nodeInstance.yBuffer = "";
 			}
@@ -169,21 +169,23 @@ var TCGLogic = {
 		}
 		if (isNeedToGenerateString)
 		{
-			var resultString = null;
-			try {
-				// Run User Answer
-				var globalXArgument = null;
+			var globalXArgument = null;
+			var globalYArgument = null;
+			if (typeof stage.globalInput != "undefined")
+			{
 				if (typeof stage.globalInput.x != "undefined")
 				{
 					globalXArgument = stage.globalInput.x;
 				}
-				var globalYArgument = null;
 				if (typeof stage.globalInput.y != "undefined")
 				{
 					globalYArgument = stage.globalInput.y;
 				}
-				
-				code.next(globalXArgument, globalYArgument);
+			}
+			
+			var resultString = null;
+			try {
+				resultString = code.next(globalXArgument, globalYArgument);
 			}
 			catch (exception) {
 				// Exception Occured
@@ -191,7 +193,7 @@ var TCGLogic = {
 				stepResult.resultFlags.errorString = exception.message;
 				return stepResult;
 			}
-			if (!this._Internal.IsValidStringInStageLanguage(resultString))
+			if (!this._Internal.IsValidStringInStageLanguage(stage, resultString))
 			{
 				// Invalid String Returned
 				stepResult.resultFlags.isError = true;
@@ -544,7 +546,7 @@ var TCGLogic = {
 		}, 
 		
 		IsValidStringInStageLanguage: function (stage, targetString) {
-			if (typeof targetString !== 'string')
+			if (typeof targetString != "string")
 			{
 				// Not a String
 				return false;

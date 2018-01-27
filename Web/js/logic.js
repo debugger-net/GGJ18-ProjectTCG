@@ -130,29 +130,285 @@ var TCGLogic = {
 			isStucked: false
 		};
 		
+		var isNotStuck = false;
+		
 		// Process Start Node
+		var isNeedToGenerateString = false;
+		var startDestination = this._Internal.GetStartConnectedNode(stage);
+		if (startDestination == TCGLogic.Types.NodeId.GOAL)
+		{
+			isNeedToGenerateString = true;
+		}
+		else
+		{
+			var destinationIndex = TCGLogic.Types.NodeId.ToNodeIndex(startDestination);
+			var destinationNodeData = stage.nodes[destinationIndex];
+			var destinationNodeStateInstance = stepResult.currentContext.nodeInstances[destinationIndex];
+			
+			// Check Dest Buffer
+			if (typeof destinationNodeData.xBufferSize != "undefined")
+			{
+				if (destinationNodeData.xFromId == TCGLogic.Types.NodeId.START)
+				{
+					if (destinationNodeStateInstance.xBuffer.length < destinationNodeData.xBufferSize)
+					{
+						isNeedToGenerateString = true;
+					}
+				}
+			}
+			if (typeof destinationNodeData.yBufferSize != "undefined")
+			{
+				if (destinationNodeData.yFromId == TCGLogic.Types.NodeId.START)
+				{
+					if (destinationNodeStateInstance.yBuffer.length < destinationNodeData.yBufferSize)
+					{
+						isNeedToGenerateString = true;
+					}
+				}
+			}
+		}
+		if (isNeedToGenerateString)
+		{
+			var resultString = null;
+			try {
+				// Run User Answer
+				var globalXArgument = null;
+				if (typeof stage.globalInput.x != "undefined")
+				{
+					globalXArgument = stage.globalInput.x;
+				}
+				var globalYArgument = null;
+				if (typeof stage.globalInput.y != "undefined")
+				{
+					globalYArgument = stage.globalInput.y;
+				}
+				
+				code.next(globalXArgument, globalYArgument);
+			}
+			catch (exception) {
+				// Exception Occured
+				stepResult.resultFlags.isError = true;
+				stepResult.resultFlags.errorString = exception.message;
+				return stepResult;
+			}
+			if (!this._Internal.IsValidStringInStageLanguage(resultString))
+			{
+				// Invalid String Returned
+				stepResult.resultFlags.isError = true;
+				stepResult.resultFlags.errorString = "The Generated String is INVALID";
+				return stepResult;
+			}
+			
+			// Success
+			if (resultString.length > 0)
+			{
+				if (startDestination == TCGLogic.Types.NodeId.GOAL)
+				{
+					stepResult.currentContext.goalBuffer = stepResult.currentContext.goalBuffer.concat(resultString);
+					stepResult.presentationEvents.push({
+						eventType: TCGLogic.Types.PresentatioEventType.OUTPUT, 
+						fromId: TCGLogic.Types.NodeId.START, 
+						toId: TCGLogic.Types.NodeId.GOAL, 
+						sendString: resultString
+					});
+				}
+				else
+				{
+					var destinationIndex = TCGLogic.Types.NodeId.ToNodeIndex(startDestination);
+					var destinationNodeData = stage.nodes[destinationIndex];
+					var destinationNodeStateInstance = stepResult.currentContext.nodeInstances[destinationIndex];
+					
+					if (typeof destinationNodeData.xBufferSize != "undefined")
+					{
+						if (destinationNodeData.xFromId == TCGLogic.Types.NodeId.START)
+						{
+							destinationNodeStateInstance.xBuffer = destinationNodeStateInstance.xBuffer.concat(resultString);
+						}
+					}
+					if (typeof destinationNodeData.yBufferSize != "undefined")
+					{
+						if (destinationNodeData.yFromId == TCGLogic.Types.NodeId.START)
+						{
+							destinationNodeStateInstance.yBuffer = destinationNodeStateInstance.yBuffer.concat(resultString);
+						}
+					}
+					
+					stepResult.presentationEvents.push({
+						eventType: TCGLogic.Types.PresentatioEventType.OUTPUT, 
+						fromId: TCGLogic.Types.NodeId.START, 
+						toId: startDestination, 
+						sendString: resultString
+					});
+				}
+				isNotStuck = true;
+			}
+		}
 		
 		// Process Normal Nodes
 		var orderedNodeList = this._Internal.GenerateDependencyOrderedNodeList(stage);
 		var nodeListLength = orderedNodeList.length;
 		for (var i = 0; i < nodeListLength; i++)
 		{
+			var nodeIndex = orderedNodeList[i];
+			var nodeData = stage.nodes[nodeIndex];
+			var nodeStateInstance = stepResult.currentContext.nodeInstances[nodeIndex];
+			
+			var isNotFilledBufferExist = false;
+			if (typeof nodeData.xBufferSize != "undefined")
+			{
+				if (nodeStateInstance.xBuffer.length < nodeData.xBufferSize)
+				{
+					if (nodeStateInstance.xBuffer.indexOf(TCGLogic.Constants.BUFFER_END) == -1)
+					{
+						isNotFilledBufferExist = true;
+					}
+				}
+			}
+			if (typeof nodeData.yBufferSize != "undefined")
+			{
+				if (nodeStateInstance.yBuffer.length < nodeData.yBufferSize)
+				{
+					if (nodeStateInstance.yBuffer.indexOf(TCGLogic.Constants.BUFFER_END) == -1)
+					{
+						isNotFilledBufferExist = true;
+					}
+				}
+			}
+			
+			if (isNotFilledBufferExist)
+			{
+				continue;
+			}
+			
+			isNotStuck = true;
+			
+			// Dequeue tokens from buffer
+			var tokenX = null;
+			var tokenY = null;
+			if (typeof nodeData.xBufferSize != "undefined")
+			{
+				var tokenDequeueResult = this._Internal.DequeueTokenFromBuffer(nodeStateInstance.xBuffer);
+				tokenX = tokenDequeueResult.token;
+				nodeStateInstance.xBuffer = tokenDequeueResult.remain;
+			}
+			if (typeof nodeData.yBufferSize != "undefined")
+			{
+				var tokenDequeueResult = this._Internal.DequeueTokenFromBuffer(nodeStateInstance.yBuffer);
+				tokenY = tokenDequeueResult.token;
+				nodeStateInstance.yBuffer = tokenDequeueResult.remain;
+			}
+			
+			// Judge isAccept
+			var isAccepted = nodeData.acceptFunc(tokenX, tokenY, nodeStateInstance.state);
+			
+			// Generate Presentatio Event
+			var presentionEvent = {
+				id: nodeIndex, 
+				isAccept: isAccepted
+			};
+			if (tokenX !== null)
+			{
+				presentionEvent.paramX = tokenX;
+				presentionEvent.remainBufferX = nodeStateInstance.xBuffer;
+			}
+			if (tokenY !== null)
+			{
+				presentionEvent.paramY = tokenY;
+				presentionEvent.remainBufferY = nodeStateInstance.yBuffer;
+			}
+			if (nodeData.stateHas)
+			{
+				presentionEvent.isStateOn = nodeStateInstance.state;
+			}
+			stepResult.presentationEvents.push(presentionEvent);
+			
+			if (!isAccepted)
+			{
+				continue;
+			}
+			
+			// Process Output
+			if (typeof nodeData.fInfo != "undefined")
+			{
+				var destinationId = this._Internal.FindOutputFDestination(stage, nodeIndex);
+				if (destinationId !== null)
+				{
+					var nodeOutput = nodeData.fFunc(tokenX, tokenY, nodeStateInstance.state);
+					if (nodeOutput.length > 0)
+					{
+						if (destinationId == TCGLogic.Types.NodeId.GOAL)
+						{
+							stepResult.currentContext.goalBuffer = stepResult.currentContext.goalBuffer.concat(nodeOutput);
+							stepResult.presentationEvents.push({
+								eventType: TCGLogic.Types.PresentatioEventType.OUTPUT, 
+								fromId: nodeIndex, 
+								toId: TCGLogic.Types.NodeId.GOAL, 
+								sendString: nodeOutput
+							});
+						}
+						else
+						{
+							var destinationNodeStateInstance = stepResult.currentContext.nodeInstances[TCGLogic.Types.NodeId.ToNodeIndex(destinationId)];
+							destinationNodeStateInstance.xBuffer = destinationNodeStateInstance.xBuffer.concat(nodeOutput);
+							stepResult.presentationEvents.push({
+								eventType: TCGLogic.Types.PresentatioEventType.OUTPUT, 
+								fromId: nodeIndex, 
+								toId: destinationId, 
+								sendString: nodeOutput
+							});
+						}
+					}
+				}
+			}
+			if (typeof nodeData.gInfo != "undefined")
+			{
+				var destinationId = this._Internal.FindOutputGDestination(stage, nodeIndex);
+				if (destinationId !== null)
+				{
+					var nodeOutput = nodeData.gFunc(tokenX, tokenY, nodeStateInstance.state);
+					if (nodeOutput.length > 0)
+					{
+						if (destinationId == TCGLogic.Types.NodeId.GOAL)
+						{
+							stepResult.currentContext.goalBuffer = stepResult.currentContext.goalBuffer.concat(nodeOutput);
+							stepResult.presentationEvents.push({
+								eventType: TCGLogic.Types.PresentatioEventType.OUTPUT, 
+								fromId: nodeIndex, 
+								toId: TCGLogic.Types.NodeId.GOAL, 
+								sendString: nodeOutput
+							});
+						}
+						else
+						{
+							var destinationNodeStateInstance = stepResult.currentContext.nodeInstances[TCGLogic.Types.NodeId.ToNodeIndex(destinationId)];
+							destinationNodeStateInstance.yBuffer = destinationNodeStateInstance.yBuffer.concat(nodeOutput);
+							stepResult.presentationEvents.push({
+								eventType: TCGLogic.Types.PresentatioEventType.OUTPUT, 
+								fromId: nodeIndex, 
+								toId: destinationId, 
+								sendString: nodeOutput
+							});
+						}
+					}
+				}
+			}
 		}
 		
 		// Judge Goal
+		if (stepResult.currentContext.goalBuffer.length > 0)
+		{
+			var judgeResult = stage.goal.acceptFunc(stepResult.currentContext.goalBuffer);
+			if (judgeResult)
+			{
+				stepResult.resultFlags.isCleared = true;
+			}
+		}
 		
-		// ****Implementing
-		// Iterate stage's nodes and build dependency graph
-		// Make node iterate list from dependency graph
-		// for (start node + node iterate list) in order
-		//   - check is need to judge - clock
-		//   - dequeue tokens from buffers
-		//   - Run Accept Function -> bake ProcessEvent
-		//     - if Accepted, Run Output Functions 
-		//       bake OutputEvents if output going
-		//       update context <- enqueue output to destination's buffer
-		// * check stuck - no node updated
-		// check goal and judge
+		// Stuck Result
+		if (!isNotStuck && !stepResult.resultFlags.isCleared)
+		{
+			stepResult.resultFlags.isStucked = true;
+		}
 		
 		return stepResult;
 	},
@@ -173,18 +429,18 @@ var TCGLogic = {
 					dependsOnList: []
 				};
 				
-				if (typeof nodeInstance.xBufferSize != "undefined")
+				if (typeof currentNodeData.xBufferSize != "undefined")
 				{
-					if (TCGLogic.Types.NodeId.IsNormalNode(nodeInstance.xFromId))
+					if (TCGLogic.Types.NodeId.IsNormalNode(currentNodeData.xFromId))
 					{
-						dependencyEntry.dependsOnList.push(TCGLogic.Types.NodeId.ToNodeIndex(nodeInstance.xFromId));
+						dependencyEntry.dependsOnList.push(TCGLogic.Types.NodeId.ToNodeIndex(currentNodeData.xFromId));
 					}
 				}
-				if (typeof nodeInstance.yBufferSize != "undefined")
+				if (typeof currentNodeData.yBufferSize != "undefined")
 				{
-					if (TCGLogic.Types.NodeId.IsNormalNode(nodeInstance.yFromId))
+					if (TCGLogic.Types.NodeId.IsNormalNode(currentNodeData.yFromId))
 					{
-						dependencyEntry.dependsOnList.push(TCGLogic.Types.NodeId.ToNodeIndex(nodeInstance.yFromId));
+						dependencyEntry.dependsOnList.push(TCGLogic.Types.NodeId.ToNodeIndex(currentNodeData.yFromId));
 					}
 				}
 				
@@ -208,11 +464,8 @@ var TCGLogic = {
 					}
 					
 					// Independent node now
-					orderedNodeList.push(stage.nodes[dependencyList[i].nodeIndex]);
-					
-					
-					// ****Implementing
-					
+					orderedNodeList.push(dependencyList[i].nodeIndex);
+					dependencyList[i].isRemoved = true;
 					
 					// Remove My Dependency
 					for (var j = 0; j < nodeCount; j++)
@@ -255,6 +508,145 @@ var TCGLogic = {
 			}
 			
 			return resultArray;
+		}, 
+		
+		GetStartConnectedNode: function (stage) {
+			var nodeCount = stage.nodes.length;
+			
+			for (var i = 0; i < nodeCount; i++)
+			{
+				var currentNodeData = stage.nodes[i];
+				
+				if (typeof currentNodeData.xBufferSize != "undefined")
+				{
+					if (currentNodeData.xFromId == TCGLogic.Types.NodeId.START)
+					{
+						return i;
+					}
+				}
+				if (typeof currentNodeData.yBufferSize != "undefined")
+				{
+					if (currentNodeData.yFromId == TCGLogic.Types.NodeId.START)
+					{
+						return i;
+					}
+				}
+			}
+			
+			// Goal Connected? Really??
+			if (stage.goal.fromId == TCGLogic.Types.NodeId.START)
+			{
+				return TCGLogic.Types.NodeId.GOAL;
+			}
+			
+			// INVALID STATE!!
+			return null;
+		}, 
+		
+		IsValidStringInStageLanguage: function (stage, targetString) {
+			if (typeof targetString !== 'string')
+			{
+				// Not a String
+				return false;
+			}
+			
+			var targetLength = targetString.length;
+			for (var i = 0; i < targetLength; i++)
+			{
+				var currentChar = targetString.charAt(i);
+				if (stage.setting.alphabets.indexOf(targetString.charAt(i)) == -1)
+				{
+					if (currentChar != TCGLogic.Constants.BUFFER_END)
+					{
+						return false;
+					}
+				}
+			}
+			
+			return true;
+		}, 
+		
+		DequeueTokenFromBuffer: function (bufferContents, bufferLength) {
+			var dequeueResult = {};
+			
+			var delimiterIndex = bufferContents.indexOf(TCGLogic.Constants.BUFFER_END);
+			if (delimiterIndex == -1 || delimiterIndex >= bufferLength)
+			{
+				if (bufferContents.length > bufferLength)
+				{
+					dequeueResult.token = bufferContents.substr(0, bufferLength);
+					dequeueResult.remain = bufferContents.substr(bufferLength);
+				}
+				else
+				{
+					dequeueResult.token = bufferContents;
+					dequeueResult.remain = "";
+				}
+			}
+			else
+			{
+				dequeueResult.token = bufferContents.substr(0, delimiterIndex);
+				if (delimiterIndex >= bufferContents.length - 1)
+				{
+					dequeueResult.remain = "";
+				}
+				else
+				{
+					dequeueResult.remain = bufferContents.substr(delimiterIndex + 1);
+				}
+			}
+			
+			return dequeueResult;
+		}, 
+		
+		FindOutputFDestination: function (stage, sourceNodeId) {
+			if (stage.goal.fromId == sourceNodeId)
+			{
+				return TCGLogic.Types.NodeId.GOAL;
+			}
+			
+			var nodeCount = stage.nodes.length;
+			
+			for (var i = 0; i < nodeCount; i++)
+			{
+				var currentNodeData = stage.nodes[i];
+				
+				if (typeof currentNodeData.xBufferSize != "undefined")
+				{
+					if (currentNodeData.xFromId == sourceNodeId)
+					{
+						return i;
+					}
+				}
+			}
+			
+			// Node Not Found
+			return null;
+		}, 
+		
+		FindOutputGDestination: function (stage, sourceNodeId) {
+			if (stage.goal.fromId == sourceNodeId)
+			{
+				return TCGLogic.Types.NodeId.GOAL;
+			}
+			
+			var nodeCount = stage.nodes.length;
+			
+			for (var i = 0; i < nodeCount; i++)
+			{
+				var currentNodeData = stage.nodes[i];
+				
+				if (typeof currentNodeData.yBufferSize != "undefined")
+				{
+					if (currentNodeData.yFromId == sourceNodeId)
+					{
+						return i;
+					}
+				}
+			}
+			
+			// Node Not Found
+			return null;
 		}
 	}
 };

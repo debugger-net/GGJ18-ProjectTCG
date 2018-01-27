@@ -77,7 +77,9 @@ PresentationEvent
 ProcessEvent : PresentationEvent
   id
   paramX?
+  remainBufferX?
   paramY?
+  remainBufferY?
   isAccept
   isStateOn?
 
@@ -105,3 +107,7 @@ StepResult
 GenerateInitialContext(stage)
 GoStep(stage, code, context) => StepResult
 
+
+
+메모: GenerateInitialContext 불러서 게임 시작하기 전에, code 객체의 init 불러주세요~! (return은 필요없으니 무시하면 됩니다)
+     Global Param이라거나 에러 핸들링 하는 법은 GoStep의 next call 하는 근처 코드 참조.

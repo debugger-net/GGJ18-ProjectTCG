@@ -1,0 +1,107 @@
+id_start			-1
+id_goal				-2
+id_globalInputX		-10
+id_globalInputY		-11
+
+presentatioEventType_Process	1
+presentatioEventType_Output		2
+
+functionInfoType_BlackBox			0
+functionInfoType_Pass				1
+functionInfoType_Block				2
+functionInfoType_Empty				3
+functionInfoType_Word				10
+functionInfoType_ExactString		20
+functionInfoType_RegularExpression	21
+functionInfoType_Pattern			22
+functionInfoType_PseudoCode			30
+
+
+E() == "\0"
+
+GetNodeIndexOfId(id)
+
+
+
+FunctionInfo
+  infoType
+  infoString?
+
+Stage
+  setting
+    alphabets
+    par
+  goal
+	posX
+	posY
+    acceptInfo
+	acceptFunc
+	fromId
+  nodes [
+	posX
+	posY
+	acceptInfo
+	acceptFunc
+	fInfo?
+	fFunc?
+	gInfo?
+	gFunc?
+	xBufferSize?
+	xFromId?
+	yBufferSize?
+	yFromId?
+	stateHas
+	stateInitial?
+  ]
+  globalInput?
+    x?
+	y?
+  start
+    initialCode
+  
+Context
+  goalBuffer
+  nodeInstances [
+    state
+	xBuffer?
+	yBuffer?
+  ]
+
+Code
+  init(globalX, globalY)
+  next(globalX, globalY)
+
+PresentationEvent
+  eventType
+
+ProcessEvent : PresentationEvent
+  id
+  paramX?
+  paramY?
+  isAccept
+  isStateOn?
+
+OutputEvent : PresentationEvent
+  fromId
+  toId
+  sendString
+
+ResultFlags
+  isError
+  errorString?
+  isCleared
+  isStucked
+
+StepResult
+  currentContext
+  presentationEvents
+  resultFlags
+
+
+
+
+
+// Real Interface
+GenerateInitialContext(stage)
+GoStep(stage, code, context) => StepResult
+

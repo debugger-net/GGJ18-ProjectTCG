@@ -1,0 +1,34 @@
+{
+	"setting": {
+		"alphabets": "AB",
+		"par": 41
+	}, 
+	"goal": {
+		"posX": 4,
+		"posY": 0,
+		"acceptInfo": {
+			"infoType": 20, 
+			"infoString": "AA"
+		}, 
+		"fromId": 0
+	}, 
+	"nodes": [
+		{
+			"posX": 2,
+			"posY": 0,
+			"acceptInfo": {
+				"infoType": 20, 
+				"infoString": "A"
+			}, 
+			"fInfo": {
+				"infoType": 1
+			},
+			"xBufferSize": 1,
+			"xFromId": -1,
+			"stateHas":false
+		}
+	], 
+	"start": {
+		"initialCode": "{\n\tnext: function () {\n\t\treturn \"B\";\n\t}\n}\n"
+	}
+}

@@ -258,21 +258,27 @@ var TCGLogic = {
 			var isNotFilledBufferExist = false;
 			if (typeof nodeData.xBufferSize != "undefined")
 			{
-				if (nodeStateInstance.xBuffer.length < nodeData.xBufferSize)
+				if (nodeData.xFromId != TCGLogic.Types.NodeId.GLOBAL_INPUT_X)
 				{
-					if (nodeStateInstance.xBuffer.indexOf(TCGLogic.Constants.BUFFER_END) == -1)
+					if (nodeStateInstance.xBuffer.length < nodeData.xBufferSize)
 					{
-						isNotFilledBufferExist = true;
+						if (nodeStateInstance.xBuffer.indexOf(TCGLogic.Constants.BUFFER_END) == -1)
+						{
+							isNotFilledBufferExist = true;
+						}
 					}
 				}
 			}
 			if (typeof nodeData.yBufferSize != "undefined")
 			{
-				if (nodeStateInstance.yBuffer.length < nodeData.yBufferSize)
+				if (nodeData.yFromId != TCGLogic.Types.NodeId.GLOBAL_INPUT_Y)
 				{
-					if (nodeStateInstance.yBuffer.indexOf(TCGLogic.Constants.BUFFER_END) == -1)
+					if (nodeStateInstance.yBuffer.length < nodeData.yBufferSize)
 					{
-						isNotFilledBufferExist = true;
+						if (nodeStateInstance.yBuffer.indexOf(TCGLogic.Constants.BUFFER_END) == -1)
+						{
+							isNotFilledBufferExist = true;
+						}
 					}
 				}
 			}
@@ -287,17 +293,31 @@ var TCGLogic = {
 			// Dequeue tokens from buffer
 			var tokenX = null;
 			var tokenY = null;
-			if (typeof nodeData.xBufferSize != "undefined")
+			if (typeof nodeData.xFromId != "undefined")
 			{
-				var tokenDequeueResult = this._Internal.DequeueTokenFromBuffer(nodeStateInstance.xBuffer);
-				tokenX = tokenDequeueResult.token;
-				nodeStateInstance.xBuffer = tokenDequeueResult.remain;
+				if (nodeData.xFromId == TCGLogic.Types.NodeId.GLOBAL_INPUT_X)
+				{
+					tokenX = stage.globalInput.x;
+				}
+				else
+				{
+					var tokenDequeueResult = this._Internal.DequeueTokenFromBuffer(nodeStateInstance.xBuffer);
+					tokenX = tokenDequeueResult.token;
+					nodeStateInstance.xBuffer = tokenDequeueResult.remain;
+				}
 			}
-			if (typeof nodeData.yBufferSize != "undefined")
+			if (typeof nodeData.yFromId != "undefined")
 			{
-				var tokenDequeueResult = this._Internal.DequeueTokenFromBuffer(nodeStateInstance.yBuffer);
-				tokenY = tokenDequeueResult.token;
-				nodeStateInstance.yBuffer = tokenDequeueResult.remain;
+				if (nodeData.yFromId == TCGLogic.Types.NodeId.GLOBAL_INPUT_Y)
+				{
+					tokenY = stage.globalInput.y;
+				}
+				else
+				{
+					var tokenDequeueResult = this._Internal.DequeueTokenFromBuffer(nodeStateInstance.yBuffer);
+					tokenY = tokenDequeueResult.token;
+					nodeStateInstance.yBuffer = tokenDequeueResult.remain;
+				}
 			}
 			
 			// Judge isAccept

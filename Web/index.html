@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="UTF-8">
+    <title>TCG</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <script type="text/javascript" src="./js/logic.js"></script>
+    <style>
+      body {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+      .container {
+        width: 600px;
+        vertical-align: middle;
+        align-self: center;
+      }
+      .nodes-container {
+        display: grid;
+      }
+      .stateFlag[data-state='false'] {
+        transform: rotate(90deg);
+        width: 25px;
+      }
+    </style>
+    <script type="text/javascript">
+
+      'use strict';
+
+      const testStage = JSON.parse(`{
+        "setting": {
+          "alphabets": "AB",
+          "par": 41
+        }, 
+        "goal": {
+          "posX": 4,
+          "posY": 0,
+          "acceptInfo": {
+            "infoType": 20, 
+            "infoString": "AA"
+          }, 
+          "fromId": 0
+        }, 
+        "nodes": [
+          {
+            "posX": 2,
+            "posY": 0,
+            "acceptInfo": {
+              "infoType": 20, 
+              "infoString": "A"
+            }, 
+            "fInfo": {
+              "infoType": 1
+            },
+            "xBufferSize": 1,
+            "xFromId": -1,
+            "stateHas":false
+          }
+        ], 
+        "start": {
+          "initialCode": "next: function() {\\n    return 'A';\\n}"
+        }
+      }`);
+
+      const createNode = (nodeData, index) => {
+        let element = document.createElement('template');
+        element.innerHTML = `
+          <div class="node card" id="n_${index}" style="grid-column: ${nodeData.posX}; grid-row: ${nodeData.posY};">
+            <div class="card-block">
+              <div class="acceptFunc card-title">Accept function: ${nodeData.acceptInfo ? nodeData.acceptFunc : ''}</div>
+              <div class="fFunc">${nodeData.fInfo ? 'f: ' + nodeData.fFunc + '' : ''}</div>
+              <div class="gFunc">${nodeData.gInfo ? 'g: ' + nodeData.gFunc + '' : ''}</div>
+              <div class="stateFlag" data-state="${nodeData.stateHas ? nodeData.stateInitial : false}">🏁</div>
+              <div class="xBuffer" data-bsize="${nodeData.xBufferSize}"></div>
+              <div class="yBuffer" data-bsize="${nodeData.yBufferSize}"></div>
+            </div>
+          </div>`.trim();
+        return element.content.firstChild;
+      };
+
+      const loadStage = (stage) => {
+        Array.from(document.getElementsByClassName('alphabet'))
+          .map(el => el.textContent = stage.setting.alphabets);
+        Array.from(document.getElementsByClassName('par'))
+          .map(el => el.textContent = stage.setting.par);
+
+        Array.from(document.getElementsByClassName('nodes-container'))
+          .map(el => {
+            el.style.gridColumnEnd = 4;
+            el.style.gridRowEnd = 4;
+            stage.nodes.push(stage.goal);
+            let arr = stage.nodes.map((node, index) => el.appendChild(createNode(node, index)));
+            arr[arr.length - 1].className += ' goal';
+          });
+
+        document.getElementById('editor').textContent = stage.start.initialCode;
+      };
+
+      const runScript = async (rawCode, lang='javascript') => {
+        if (typeof rawCode === 'undefined')
+          return runScript(document.getElementById('editor').value, lang);
+        
+        let ctx = TCGLogic.GenerateInitialContext(stageTestBootstrap(testStage));
+        let code = eval(`({${rawCode}})`);
+        if (typeof code.init === 'function') {
+          code.init();
+        }
+
+        const proceedStep = async () => {
+          const result = TCGLogic.GoStep(testStage, code, ctx);
+          await Promise.all(result.presentationEvents.map(event => {
+            if (event.eventType == 2) { // Output
+
+            } else { // Process
+              const node = document.getElementById(`n_${event.id}`);
+              node.querySelector('.stateFlag').dataset.state = event.isAccept;
+//              node.querySelector('.xBuffer').textContent = 
+            }
+          }));
+
+          await new Promise((resolve) => setTimeout(() => resolve(), 500));
+
+          return result;
+        };
+        let tmp;
+        do {
+          tmp = await proceedStep();
+          console.log(tmp);
+        } while (tmp.resultFlags.isCleared !== true);
+
+        const goal = document.getElementsByClassName(`goal`)[0];
+        goal.querySelector('.stateFlag').dataset.state = true;
+      };
+
+      const stageTestBootstrap = (preObject) => {
+        preObject.goal.acceptFunc = c => c == 'AA';
+        
+        preObject.nodes[0].acceptFunc = c => c == 'A';
+        preObject.nodes[0].fFunc = TCGLogic.CommonFunctions.OutputFunctions.Pass;
+        
+        return preObject;
+      }
+      
+      window.onload = () => loadStage(stageTestBootstrap(testStage));
+    </script>
+    <script type="text/javascript">
+      let preObject = {
+        setting: {
+          alphabets: 'A',
+          par: 10
+        },
+        goal: {
+          acceptFunc: c => c == 'AA'
+        },
+        nodes: [
+          {
+            acceptFunc: c => c == 'A',
+            fFunc: TCGLogic.CommonFunctions.AcceptFunctions.Pass
+          }
+        ]
+      };
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="stage-info">
+        <legend>Alphabet: <span class="alphabet"></span></legend>
+        <legend>Par: <span class="par"></span></legend>
+      </div>
+      <div class="nodes-container">
+      </div>
+      <form onsubmit="runScript();return false;" class="code-editor form-control">
+        <textarea id="editor" class="form-control"></textarea>
+        <input type="submit" class="form-control" value="Execute!" />
+      </form>
+    </div>
+  </body>
+</html>
